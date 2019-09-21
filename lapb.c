@@ -164,6 +164,7 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			lapbstate(axp,LAPB_SETUP);	/* Re-establish */	
 			break;			
 		case FRMR:
+			/* XXX TODO: actually enter framre reject state? */
 			est_link(axp);
 			lapbstate(axp,LAPB_SETUP);	/* Re-establish link */
 			break;
@@ -254,6 +255,7 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			lapbstate(axp,LAPB_SETUP);	/* Re-establish */	
 			break;
 		case FRMR:
+			/* XXX TODO: actually enter framre reject state? */
 			est_link(axp);
 			lapbstate(axp,LAPB_SETUP);	/* Re-establish link */
 			break;
@@ -350,6 +352,7 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			break;		/* Ignored */
 		}
 		break;
+	/* XXX TODO: figure out (read the spec) to know how to enter this state from a received frame */
 	case LAPB_FRAMEREJECT:
                 switch(type){
                 case SABM:
