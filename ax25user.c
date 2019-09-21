@@ -143,8 +143,10 @@ uint cnt;
 	}
 	/* If this has un-busied us, send a RR to reopen the window */
 	if(len_p(axp->rxq) < axp->window
-	 && (len_p(axp->rxq) + bp->cnt) >= axp->window)
-		sendctl(axp,LAPB_RESPONSE,RR);
+	 && (len_p(axp->rxq) + bp->cnt) >= axp->window) {
+		//sendctl(axp,LAPB_RESPONSE,RR);
+		start_timer(&axp->t2);
+	}
 
 	return bp;
 }
