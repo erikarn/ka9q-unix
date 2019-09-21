@@ -145,6 +145,7 @@ uint cnt;
 	if(len_p(axp->rxq) < axp->window
 	 && (len_p(axp->rxq) + bp->cnt) >= axp->window) {
 		//sendctl(axp,LAPB_RESPONSE,RR);
+		stop_timer(&axp->t2);
 		start_timer(&axp->t2);
 	}
 

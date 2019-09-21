@@ -87,6 +87,7 @@ send_ack(void *p)
         case LAPB_CONNECTED:
         case LAPB_RECOVERY:
                 control = len_p(axp->rxq) > axp->window ? RNR : RR;
+		/* note: sendctl(RESPONSE, RR or RNR) */
                 sendctl(axp,LAPB_RESPONSE,control);
                 axp->response = 0;
                 break;

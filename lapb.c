@@ -196,8 +196,10 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 				 * drastic action is necessary to avoid
 				 * deadlock.
 				 */
-				if(poll)
+				if(poll) {
+					// sendctl(RESPONSE, RNR)
 					sendctl(axp,LAPB_RESPONSE,RNR|pf);
+				}
 				free_p(bpp);
 				break;
 			}
@@ -205,9 +207,11 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			if(ns != axp->vr){
 				if(axp->proto == V1 || !axp->flags.rejsent){
 					axp->flags.rejsent = YES;
+					// sendctl(RESPONSE, REJ)
 					sendctl(axp,LAPB_RESPONSE,REJ | pf);
-				} else if(poll)
+				} else if(poll) {
 					enq_resp(axp);
+				}
 				axp->response = 0;
 				stop_timer(&axp->t2);
 				break;
@@ -216,9 +220,14 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			axp->vr = (axp->vr+1) & MMASK;
 			tmp = len_p(axp->rxq) >= axp->window ? RNR : RR;
 			if(poll){
-				sendctl(axp,LAPB_RESPONSE,tmp|PF);
+				// sendctl(RESPONSE, RNR, RR)
+				//sendctl(axp,LAPB_RESPONSE,tmp|PF);
+				axp->response = tmp | PF;
+				stop_timer(&axp->t2);
+				start_timer(&axp->t2);
 			} else {
 				axp->response = tmp;
+				stop_timer(&axp->t2);
 				start_timer(&axp->t2);
 			}
 			procdata(axp,bpp);
@@ -323,6 +332,7 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 				 * drastic action is necessary to avoid
 				 * memory deadlock.
 				 */
+				// sendctl(RESPONSE, RNR)
 				sendctl(axp,LAPB_RESPONSE,RNR | pf);
 				free_p(bpp);
 				break;
@@ -331,6 +341,7 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			if(ns != axp->vr){
 				if(axp->proto == V1 || !axp->flags.rejsent){
 					axp->flags.rejsent = YES;
+					// sendctl(RESPONSE, REJ)
 					sendctl(axp,LAPB_RESPONSE,REJ | pf);
 				}
 				axp->response = 0;
@@ -341,9 +352,14 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			axp->vr = (axp->vr+1) & MMASK;
 			tmp = len_p(axp->rxq) >= axp->window ? RNR : RR;
 			if(poll){
-				sendctl(axp,LAPB_RESPONSE,tmp|PF);
+				// sendctl(RESPONSE, RNR / RR)
+				//sendctl(axp,LAPB_RESPONSE,tmp|PF);
+				axp->response = tmp | PF;
+				stop_timer(&axp->t2);
+				start_timer(&axp->t2);
 			} else {
 				axp->response = tmp;
+				stop_timer(&axp->t2);
 				start_timer(&axp->t2);
 			}
 			procdata(axp,bpp);
@@ -485,10 +501,13 @@ enq_resp(struct ax25_cb *axp)
 {
 	char ctl;
 
+	// XXX TODO: maybe convert this over to a t2?
 	ctl = len_p(axp->rxq) >= axp->window ? RNR|PF : RR|PF;	
+	// sendctl(RESPONSE, RNR / RR)
 	sendctl(axp,LAPB_RESPONSE,ctl);
 	axp->response = 0;
 	stop_timer(&axp->t3);
+	stop_timer(&axp->t2);
 }
 /* Invoke retransmission */
 static void
