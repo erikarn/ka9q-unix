@@ -10,8 +10,7 @@
  * This file depends only on internal macros or those defined on the
  * command line, so it may be safely included first.
  */
-
-#define TNC0_T2INIT             4
+#define TNC0_T2INIT     1000L /* 1 second ; is 4 seconds in N0ARY? */
 
 #if	!defined(AMIGA) && (defined(MAC) || defined(MSDOS))
 /* These compilers require special open modes when reading binary files.
