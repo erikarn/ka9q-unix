@@ -10,7 +10,7 @@
  * This file depends only on internal macros or those defined on the
  * command line, so it may be safely included first.
  */
-#define TNC0_T2INIT     1000L /* 1 second ; is 4milliseconds in N0ARY? */
+#define TNC0_T2INIT     1000L /* 1 second T2 expiry before sending ACKs */
 
 #if	!defined(AMIGA) && (defined(MAC) || defined(MSDOS))
 /* These compilers require special open modes when reading binary files.
