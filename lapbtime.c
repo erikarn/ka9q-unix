@@ -44,6 +44,7 @@ recover(void *p)
 		}
 		break;
 	case LAPB_CONNECTED:
+		axp->retries = 0;
 	case LAPB_RECOVERY:
 		if(axp->n2 != 0 && axp->retries > axp->n2){
 			/* Give up */
@@ -57,9 +58,41 @@ recover(void *p)
 			lapbstate(axp,LAPB_RECOVERY);
 		}
 		break;
+        case LAPB_FRAMEREJECT:
+                if(axp->n2 != 0 && axp->retries == axp->n2){
+                        sendctl(axp,LAPB_RESPONSE,DM|PF);
+                        free_q(&axp->txq);
+                        lapbstate(axp,LAPB_DISCONNECTED);
+                } else {
+                        frmr(axp,0,0);  /* Retransmit last FRMR */
+                        start_timer(&axp->t1);
+                        axp->retries++;
+                }
+                break;
 	default:
 		break;
 	}
+	/* Empty the trash */
+	if (axp->state == LAPB_DISCONNECTED)
+		del_ax25(axp);
+}
+
+/* T2 has expired, we can't delay an acknowledgement any further */
+void
+send_ack(void *p)
+{
+        char control;
+        struct ax25_cb *axp = (struct ax25_cb *)p;
+        switch(axp->state){
+        case LAPB_CONNECTED:
+        case LAPB_RECOVERY:
+                control = len_p(axp->rxq) > axp->window ? RNR : RR;
+                sendctl(axp,LAPB_RESPONSE,control);
+                axp->response = 0;
+                break;
+	default:
+		break;
+        }
 }
 
 

@@ -307,6 +307,13 @@ struct ax25_cb *axp;
 		kprintf("stop");
 	kprintf("/%lu ms; ",dur_timer(&axp->t1));
 
+	kprintf("T2: ");
+	if(run_timer(&axp->t2))
+		kprintf("%lu",read_timer(&axp->t2));
+	else
+		kprintf("stop");
+	kprintf("/%lu ms; ",dur_timer(&axp->t2));
+
 	kprintf("T3: ");
 	if(run_timer(&axp->t3))
 		kprintf("%lu",read_timer(&axp->t3));

@@ -11,6 +11,8 @@
  * command line, so it may be safely included first.
  */
 
+#define TNC0_T2INIT             4
+
 #if	!defined(AMIGA) && (defined(MAC) || defined(MSDOS))
 /* These compilers require special open modes when reading binary files.
  *

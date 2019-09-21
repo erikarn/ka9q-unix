@@ -63,6 +63,7 @@ int user;		/* User linkage area */
 		free_q(&axp->txq);
 		break;
 	case LAPB_DISCPENDING:	/* Ignore */
+	case LAPB_FRAMEREJECT:
 		break;
 	case LAPB_RECOVERY:
 	case LAPB_CONNECTED:
@@ -166,6 +167,7 @@ struct ax25_cb *axp;
 		break;
 	case LAPB_CONNECTED:
 	case LAPB_RECOVERY:
+	case LAPB_FRAMEREJECT:
 		free_q(&axp->txq);
 		axp->retries = 0;
 		sendctl(axp,LAPB_COMMAND,DISC|PF);
