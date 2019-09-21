@@ -99,9 +99,12 @@ struct ax25_cb {
 		LAPB_SETUP,
 		LAPB_DISCPENDING,
 		LAPB_CONNECTED,
-		LAPB_RECOVERY
+		LAPB_RECOVERY,
+		LAPB_FRAMEREJECT,
 	} state;			/* Link state */
+	char frmrinfo[3];		/* I-field for FRMR message */
 	struct timer t1;		/* Retry timer */
+	struct timer t2;		/* Acknowledgement delay timer */
 	struct timer t3;		/* Keep-alive poll timer */
 	int32 rtt_time;			/* Stored clock values for RTT, ticks */
 	int rtt_seq;			/* Sequence number being timed */
@@ -163,6 +166,7 @@ int lapb_input(struct ax25_cb *axp,int cmdrsp,struct mbuf **bp);
 int lapb_output(struct ax25_cb *axp);
 struct mbuf *segmenter(struct mbuf **bp,uint ssize);
 int sendctl(struct ax25_cb *axp,int cmdrsp,int cmd);
+int frmr(struct ax25_cb *axp, char control, char reason);
 int sendframe(struct ax25_cb *axp,int cmdrsp,int ctl,struct mbuf **data);
 void axnl3(struct iface *iface,struct ax25_cb *axp,uint8 *src,
 	uint8 *dest,struct mbuf **bp,int mcast);
@@ -170,6 +174,7 @@ void axnl3(struct iface *iface,struct ax25_cb *axp,uint8 *src,
 /* In lapbtimer.c: */
 void pollthem(void *p);
 void recover(void *p);
+void send_ack(void *p);
 
 /* In ax25subr.c: */
 uint ftype(uint control);

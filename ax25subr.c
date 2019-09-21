@@ -73,6 +73,7 @@ del_ax25(struct ax25_cb *conn)
 
 	/* Timers should already be stopped, but just in case... */
 	stop_timer(&axp->t1);
+	stop_timer(&axp->t2);
 	stop_timer(&axp->t3);
 
 	/* Free allocated resources */
@@ -100,6 +101,7 @@ cr_ax25(uint8 *addr)
 		 */
 		axp = (struct ax25_cb *)callocw(1,sizeof(struct ax25_cb));
 		axp->next = Ax25_cb;
+		/* XXX TODO: init_timer */
 		Ax25_cb = axp;
 	}
 	axp->user = -1;
@@ -111,9 +113,14 @@ cr_ax25(uint8 *addr)
 	axp->pthresh = Pthresh;
 	axp->n2 = N2;
 	axp->srt = Axirtt;
+
 	set_timer(&axp->t1,2*axp->srt);
 	axp->t1.func = recover;
 	axp->t1.arg = axp;
+
+	set_timer(&axp->t2, TNC0_T2INIT);
+	axp->t2.func = send_ack;
+	axp->t2.arg = axp;
 
 	set_timer(&axp->t3,T3init);
 	axp->t3.func = pollthem;

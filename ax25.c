@@ -337,6 +337,8 @@ struct mbuf **bpp
 		memcpy(axp->remote,hdr.source,AXALEN);
 		memcpy(axp->local,hdr.dest,AXALEN);
 		axp->iface = iface;
+
+		/* XXX TODO: construct reverse digipeater path; scale timers for extra delay */
 	}
 	if(hdr.cmdrsp == LAPB_UNKNOWN)
 		axp->proto = V1;	/* Old protocol in use */
