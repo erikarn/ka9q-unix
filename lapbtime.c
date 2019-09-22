@@ -81,20 +81,30 @@ recover(void *p)
 void
 send_ack(void *p)
 {
-        char control;
-        struct ax25_cb *axp = (struct ax25_cb *)p;
-        switch(axp->state){
-        case LAPB_CONNECTED:
-        case LAPB_RECOVERY:
-                control = len_p(axp->rxq) > axp->window ? RNR : RR;
+	char control;
+	struct ax25_cb *axp = (struct ax25_cb *)p;
+	switch(axp->state){
+	case LAPB_CONNECTED:
+	case LAPB_RECOVERY:
+		if (axp->flags.send_rej) {
+			control = REJ;
+			axp->flags.send_rej = 0;
+		} else {
+			control = len_p(axp->rxq) > axp->window ? RNR : RR;
+		}
+		if (axp->flags.send_pf) {
+			control |= PF;
+		}
 		/* note: sendctl(RESPONSE, RR or RNR) */
 		/* Note: PF? F flag? */
-                sendctl(axp,LAPB_RESPONSE,control);
-                axp->response = 0;
-                break;
+		sendctl(axp,LAPB_RESPONSE,control);
+		axp->response = 0;
+		axp->flags.send_rej = 0;
+		axp->flags.send_pf = 0;
+		break;
 	default:
 		break;
-        }
+	}
 }
 
 

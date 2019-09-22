@@ -61,6 +61,19 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			break;
 		}
 	}
+
+	/*
+	 * If we're receiving active lapb traffic then assume that
+	 * we're not going to be transmitting any time soon.
+	 * So if t2 is already scheduled then we have some kind of
+	 * state update to send; just kick it to run a bit longer
+	 * so it doesn't expire /during/ receiving traffic and
+	 * start sending RR/REJ/RNRs based on each I frame.
+	 */
+	if (axp->t2.state == TIMER_RUN) {
+		start_timer(&axp->t2);
+	}
+
 	/* Extract sequence numbers, if present */
 	switch(class){
 	case I:
@@ -171,14 +184,16 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 		case RR:
 		case RNR:
 			axp->flags.remotebusy = (control == RNR) ? YES : NO;
-			if(poll)
+			if(poll) {
 				enq_resp(axp);
+			}
 			ackours(axp,nr);
 			break;
 		case REJ:
 			axp->flags.remotebusy = NO;
-			if(poll)
+			if(poll) {
 				enq_resp(axp);
+			}
 			ackours(axp,nr);
 			stop_timer(&axp->t1);
 			start_timer(&axp->t3);
@@ -197,8 +212,8 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 				 * deadlock.
 				 */
 				if(poll) {
-					// sendctl(RESPONSE, RNR)
 					sendctl(axp,LAPB_RESPONSE,RNR|pf);
+					stop_timer(&axp->t2);
 				}
 				free_p(bpp);
 				break;
@@ -207,25 +222,28 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			if(ns != axp->vr){
 				if(axp->proto == V1 || !axp->flags.rejsent){
 					axp->flags.rejsent = YES;
-					// sendctl(RESPONSE, REJ)
-					sendctl(axp,LAPB_RESPONSE,REJ | pf);
+					axp->flags.send_rej = 1;
+					axp->flags.send_pf = (!! pf);
+					start_timer(&axp->t2);
 				} else if(poll) {
 					enq_resp(axp);
 				}
 				axp->response = 0;
-				stop_timer(&axp->t2);
 				break;
 			}
 			axp->flags.rejsent = NO;
 			axp->vr = (axp->vr+1) & MMASK;
 			tmp = len_p(axp->rxq) >= axp->window ? RNR : RR;
 			if(poll){
-				// sendctl(RESPONSE, RNR, RR)
 				//sendctl(axp,LAPB_RESPONSE,tmp|PF);
 				stop_timer(&axp->t2);
+				axp->flags.send_rej = 0;
+				axp->flags.send_pf = 1;
 				start_timer(&axp->t2);
 			} else {
 				stop_timer(&axp->t2);
+				axp->flags.send_rej = 0;
+				axp->flags.send_pf = 0;
 				start_timer(&axp->t2);
 			}
 			procdata(axp,bpp);
@@ -279,8 +297,9 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 					lapbstate(axp,LAPB_CONNECTED);
 				}
 			} else {
-				if(poll)
+				if(poll) {
 					enq_resp(axp);
+				}
 				ackours(axp,nr);
 				/* Keep timer running even if all frames
 				 * were acked, since we must see a Final
@@ -302,8 +321,9 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 					lapbstate(axp,LAPB_CONNECTED);
 				}
 			} else {
-				if(poll)
+				if(poll) {
 					enq_resp(axp);
+				}
 				ackours(axp,nr);
 				if(axp->unack != 0){
 					/* This is certain to trigger output */
@@ -324,14 +344,16 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			 */
 			if(!run_timer(&axp->t1))
 				start_timer(&axp->t1);
-			if(len_p(axp->rxq) >= axp->window){
+			if(len_p(axp->rxq) >= axp->window) {
 				/* Too bad he didn't listen to us; he'll
 				 * have to resend the frame later. This
 				 * drastic action is necessary to avoid
 				 * memory deadlock.
 				 */
 				// sendctl(RESPONSE, RNR)
-				sendctl(axp,LAPB_RESPONSE,RNR | pf);
+				axp->flags.send_rej = 0;
+				axp->flags.send_pf = !! pf;
+				start_timer(&axp->t2);
 				free_p(bpp);
 				break;
 			}
@@ -339,11 +361,11 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			if(ns != axp->vr){
 				if(axp->proto == V1 || !axp->flags.rejsent){
 					axp->flags.rejsent = YES;
-					// sendctl(RESPONSE, REJ)
-					sendctl(axp,LAPB_RESPONSE,REJ | pf);
+					axp->flags.send_rej = 1;
+					axp->flags.send_pf = !! pf;
+					start_timer(&axp->t2);
 				}
 				axp->response = 0;
-				stop_timer(&axp->t2);
 				break;
 			}
 			axp->flags.rejsent = NO;
@@ -352,10 +374,14 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			if(poll){
 				// sendctl(RESPONSE, RNR / RR)
 				//sendctl(axp,LAPB_RESPONSE,tmp|PF);
+				axp->flags.send_rej = 0;
+				axp->flags.send_pf = 1;
 				stop_timer(&axp->t2);
 				start_timer(&axp->t2);
 			} else {
 				stop_timer(&axp->t2);
+				axp->flags.send_rej = 0;
+				axp->flags.send_pf = 0;
 				start_timer(&axp->t2);
 			}
 			procdata(axp,bpp);
@@ -494,19 +520,31 @@ clr_ex(struct ax25_cb *axp)
 	axp->response = 0;
 	stop_timer(&axp->t3);
 }
+
 /* Enquiry response */
 static void
 enq_resp(struct ax25_cb *axp)
 {
 	char ctl;
 
+	stop_timer(&axp->t3);
+	stop_timer(&axp->t2);
+
+	/*
+	 * Experiment with this being a T2 timer so they're not
+	 * spammed out.  The T2 timer here may be a bit long
+	 * in response to a poll, but if this works well then
+	 * maybe it'll be worth making the T2 timer variable.
+	 */
+	axp->flags.send_rej = 0;
+	axp->flags.send_pf = 1;
+
 	// XXX TODO: maybe convert this over to a t2?
 	ctl = len_p(axp->rxq) >= axp->window ? RNR|PF : RR|PF;	
 	// sendctl(RESPONSE, RNR / RR)
-	sendctl(axp,LAPB_RESPONSE,ctl);
-	axp->response = 0;
-	stop_timer(&axp->t3);
-	stop_timer(&axp->t2);
+	//sendctl(axp,LAPB_RESPONSE,ctl);
+	//axp->response = 0;
+	start_timer(&axp->t2);
 }
 /* Invoke retransmission */
 static void
@@ -549,8 +587,9 @@ int cmd
 ){
 	struct mbuf *mb = NULL;
 
-	if((ftype((char)cmd) & 0x3) == S)	/* Insert V(R) if S frame */
+	if((ftype((char)cmd) & 0x3) == S) {	/* Insert V(R) if S frame */
 		cmd |= (axp->vr << 5);
+	}
 	return sendframe(axp,cmdrsp,cmd,&mb);
 }
 /* Start data transmission on link, if possible

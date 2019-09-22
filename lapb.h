@@ -72,6 +72,8 @@ struct ax25_cb {
 		unsigned int rtt_run:1;		/* Round trip "timer" is running */
 		unsigned int retrans:1;		/* A retransmission has occurred */
 		unsigned int clone:1;		/* Server-type cb, will be cloned */
+		unsigned int send_rej:1;	/* When doing T2, control whether to send REJ */
+		unsigned int send_pf:1;		/* When doing T2, control whether this was PF */
 	} flags;
 
 	uint8 reason;			/* Reason for connection closing */
