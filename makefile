@@ -3,11 +3,11 @@
 #
 # parameters for typical UNIX installation
 #
-CC= gcc
+CC= cc
 RM= rm -f
 LIB= ar
-CFLAGS= -g -DHOST_BSD -Wall -Werror -Wno-int-to-void-pointer-cast -O3
-LFLAGS= -lcurses -pthreads
+CFLAGS= -g -DHOST_BSD -Wall -Werror -Wno-int-to-void-pointer-cast -O
+LFLAGS= -lcurses -pthread
 
 # List of libraries
 
