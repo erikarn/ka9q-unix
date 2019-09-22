@@ -100,7 +100,8 @@ uint8 tos
 		free_p(bpp);
 		return -1;
 	}
-	return send_ax25(axp,&tbp,-1);
+	send_ax25(axp,&tbp,-1);
+	return 1;
 }
 /* Add header and send connectionless (UI) AX.25 packet.
  * Note that the calling order here must match enet_output

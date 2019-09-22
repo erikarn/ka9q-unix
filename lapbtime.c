@@ -77,36 +77,59 @@ recover(void *p)
 		del_ax25(axp);
 }
 
-/* T2 has expired, we can't delay an acknowledgement any further */
+/*
+ * T2 has expired; send any pending ACKs / data that has been queued.
+ */
 void
 send_ack(void *p)
 {
 	char control;
 	struct ax25_cb *axp = (struct ax25_cb *)p;
-	switch(axp->state){
-	case LAPB_CONNECTED:
-	case LAPB_RECOVERY:
-		if (axp->flags.send_rej) {
-			control = REJ;
+
+	/*
+	 * First, send any pending data frames.
+	 *
+	 * This path can also implicitly ACK frames, which means
+	 * anything that had set a pending axp->response field
+	 */
+	if (axp->flags.send_data) {
+		lapb_output(axp);
+		axp->flags.send_data = 0;
+	}
+
+	/*
+	 * Next, send any pending RR/RNR/REJ frame.
+	 *
+	 * These have been delayed in order to ensure that our state
+	 * machine for updating our local state for what the remote side
+	 * is sending us doesn't queue frames on every received frame.
+	 */
+	if (axp->flags.send_ack) {
+		switch(axp->state) {
+		case LAPB_CONNECTED:
+		case LAPB_RECOVERY:
+			if (axp->flags.send_rej) {
+				control = REJ;
+				axp->flags.send_rej = 0;
+			} else {
+				control = len_p(axp->rxq) > axp->window ? RNR : RR;
+			}
+			if (axp->flags.send_pf) {
+				control |= PF;
+			}
+			/* note: sendctl(RESPONSE, RR or RNR) */
+			/* Note: PF? F flag? */
+			sendctl(axp,LAPB_RESPONSE,control);
+			axp->response = 0;
 			axp->flags.send_rej = 0;
-		} else {
-			control = len_p(axp->rxq) > axp->window ? RNR : RR;
+			axp->flags.send_pf = 0;
+			break;
+		default:
+			break;
 		}
-		if (axp->flags.send_pf) {
-			control |= PF;
-		}
-		/* note: sendctl(RESPONSE, RR or RNR) */
-		/* Note: PF? F flag? */
-		sendctl(axp,LAPB_RESPONSE,control);
-		axp->response = 0;
-		axp->flags.send_rej = 0;
-		axp->flags.send_pf = 0;
-		break;
-	default:
-		break;
+		axp->flags.send_ack = 0;
 	}
 }
-
 
 /* Send a poll (S-frame command with the poll bit set) */
 void

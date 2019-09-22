@@ -74,6 +74,8 @@ struct ax25_cb {
 		unsigned int clone:1;		/* Server-type cb, will be cloned */
 		unsigned int send_rej:1;	/* When doing T2, control whether to send REJ */
 		unsigned int send_pf:1;		/* When doing T2, control whether this was PF */
+		unsigned int send_ack:1;	/* When doing T2, control whether to send an ACK of any kind */
+		unsigned int send_data:1;	/* When doing T2, control whether to send data */
 	} flags;
 
 	uint8 reason;			/* Reason for connection closing */
@@ -159,13 +161,14 @@ struct ax25_cb *open_ax25(struct iface *,uint8 *,uint8 *,
 	int user);
 struct mbuf *recv_ax25(struct ax25_cb *axp,uint cnt);
 int reset_ax25(struct ax25_cb *axp);
-int send_ax25(struct ax25_cb *axp,struct mbuf **bp,int pid);
+void send_ax25(struct ax25_cb *axp,struct mbuf **bp,int pid);
 
 /* In lapb.c: */
 void est_link(struct ax25_cb *axp);
 void lapbstate(struct ax25_cb *axp,int s);
 int lapb_input(struct ax25_cb *axp,int cmdrsp,struct mbuf **bp);
 int lapb_output(struct ax25_cb *axp);
+void queue_lapb_output(struct ax25_cb *axp);
 struct mbuf *segmenter(struct mbuf **bp,uint ssize);
 int sendctl(struct ax25_cb *axp,int cmdrsp,int cmd);
 int frmr(struct ax25_cb *axp, char control, char reason);

@@ -10,7 +10,17 @@
  * This file depends only on internal macros or those defined on the
  * command line, so it may be safely included first.
  */
-#define TNC0_T2INIT     2000L /* 2 second T2 expiry before sending ACKs */
+
+/*
+ * This is a straight hard-code timeout for delaying sending data and
+ * ACKs.
+ *
+ * It's 2 seconds right now because until there's a way to know about
+ * the state of the receive squelch in software, the sender doesn't
+ * know the channel is busy.  So, 256 bytes @ 1200bps is around 1.7
+ * seconds. Round it up to 2.
+ */
+#define TNC0_T2INIT     2000L /* 2 second T2 expiry before sending ACKs/data */
 
 #if	!defined(AMIGA) && (defined(MAC) || defined(MSDOS))
 /* These compilers require special open modes when reading binary files.

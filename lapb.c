@@ -224,6 +224,7 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 					axp->flags.rejsent = YES;
 					axp->flags.send_rej = 1;
 					axp->flags.send_pf = (!! pf);
+					axp->flags.send_ack = 1;
 					start_timer(&axp->t2);
 				} else if(poll) {
 					enq_resp(axp);
@@ -239,11 +240,13 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 				stop_timer(&axp->t2);
 				axp->flags.send_rej = 0;
 				axp->flags.send_pf = 1;
+				axp->flags.send_ack = 1;
 				start_timer(&axp->t2);
 			} else {
 				stop_timer(&axp->t2);
 				axp->flags.send_rej = 0;
 				axp->flags.send_pf = 0;
+				axp->flags.send_ack = 1;
 				start_timer(&axp->t2);
 			}
 			procdata(axp,bpp);
@@ -353,6 +356,7 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 				// sendctl(RESPONSE, RNR)
 				axp->flags.send_rej = 0;
 				axp->flags.send_pf = !! pf;
+				axp->flags.send_ack = 1;
 				start_timer(&axp->t2);
 				free_p(bpp);
 				break;
@@ -363,6 +367,7 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 					axp->flags.rejsent = YES;
 					axp->flags.send_rej = 1;
 					axp->flags.send_pf = !! pf;
+					axp->flags.send_ack = 1;
 					start_timer(&axp->t2);
 				}
 				axp->response = 0;
@@ -376,12 +381,14 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 				//sendctl(axp,LAPB_RESPONSE,tmp|PF);
 				axp->flags.send_rej = 0;
 				axp->flags.send_pf = 1;
+				axp->flags.send_ack = 1;
 				stop_timer(&axp->t2);
 				start_timer(&axp->t2);
 			} else {
 				stop_timer(&axp->t2);
 				axp->flags.send_rej = 0;
 				axp->flags.send_pf = 0;
+				axp->flags.send_ack = 1;
 				start_timer(&axp->t2);
 			}
 			procdata(axp,bpp);
@@ -421,14 +428,26 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 	}
 	free_p(bpp);	/* In case anything's left */
 
-	/* See if we can send some data, perhaps piggybacking an ack.
+	/*
+	 * See if we can send some data, perhaps piggybacking an ack.
 	 * If successful, lapb_output will clear axp->response.
 	 */
-	lapb_output(axp);
+	queue_lapb_output(axp);
+
+	/*
+	 * queue_lapb_output won't queue if the state isn't ready for
+	 * sending data.  In that case if something requested a response
+	 * then send it immediately here; this may be our final chance
+	 * before deleting the session.
+	 */
 	if (axp->response != 0){
 		sendctl(axp,LAPB_RESPONSE,axp->response);
 		axp->response = 0;
 	}
+
+	/*
+	 * Delete the session if needed.
+	 */
 	if (axp->state == LAPB_DISCONNECTED) {
 		del_ax25(axp);
 	}
@@ -536,14 +555,13 @@ enq_resp(struct ax25_cb *axp)
 	 * in response to a poll, but if this works well then
 	 * maybe it'll be worth making the T2 timer variable.
 	 */
+	axp->flags.send_ack = 1;
 	axp->flags.send_rej = 0;
 	axp->flags.send_pf = 1;
 
-	// XXX TODO: maybe convert this over to a t2?
-	ctl = len_p(axp->rxq) >= axp->window ? RNR|PF : RR|PF;	
-	// sendctl(RESPONSE, RNR / RR)
-	//sendctl(axp,LAPB_RESPONSE,ctl);
-	//axp->response = 0;
+	ctl = len_p(axp->rxq) >= axp->window ? RNR|PF : RR|PF;
+	/* Make sure no pending responses go out in the data path */
+	axp->response = 0;
 	start_timer(&axp->t2);
 }
 /* Invoke retransmission */
@@ -592,6 +610,30 @@ int cmd
 	}
 	return sendframe(axp,cmdrsp,cmd,&mb);
 }
+
+/*
+ * Queue data transmission for this peer.
+ *
+ * Right now this just sets the flag and kicks t2.
+ */
+void
+queue_lapb_output(struct ax25_cb *axp)
+
+{
+
+	/*
+	 * Don't try to queue further work if we're not connected.
+	 */
+	if (axp == NULL
+	 || (axp->state != LAPB_RECOVERY && axp->state != LAPB_CONNECTED)
+	 || axp->flags.remotebusy) {
+		return;
+	}
+
+	axp->flags.send_data = 1;
+	start_timer(&axp->t2);
+}
+
 /* Start data transmission on link, if possible
  * Return number of frames sent
  */
@@ -628,11 +670,27 @@ lapb_output(struct ax25_cb *axp)
 			return sent;	/* Probably out of memory */
 		sendframe(axp,LAPB_COMMAND,control,&tbp);
 		axp->unack++;
-		/* We're implicitly acking any data he's sent, so stop any
+		/*
+		 * We're implicitly acking any data he's sent, so stop any
 		 * delayed ack
+		 *
+		 * Note: axp->response is now only used for signaling
+		 * disconnect, not delayed ACK.  It's likely dead code at
+		 * this point.
 		 */
 		axp->response = 0;
-		stop_timer(&axp->t2);
+		/*
+		 * Note: this may be a bit hairy.
+		 *
+		 * If someone sent us a poll/final request, then make sure
+		 * we're still on the hook for sending it.  This may be
+		 * incorrect behaviour so some experimentation will be
+		 * needed.  At least it'll be in sync with the current
+		 * receiver window, rather than stale.
+		 */
+		if (! axp->flags.send_pf) {
+			axp->flags.send_ack = 0;
+		}
 		if(!run_timer(&axp->t1)){
 			stop_timer(&axp->t3);
 			start_timer(&axp->t1);

@@ -85,7 +85,7 @@ int user;		/* User linkage area */
  * of distinct packets) already has a PID on the front and it is passed
  * through directly even if it is very large.
  */
-int
+void
 send_ax25(
 struct ax25_cb *axp,
 struct mbuf **bpp,
@@ -96,7 +96,7 @@ int pid
 
 	if(axp == NULL || bpp == NULL || *bpp == NULL){
 		free_p(bpp);
-		return -1;
+		return;
 	}
 	if(pid != -1){
 		offset = 0;
@@ -119,7 +119,7 @@ int pid
 	} else {
 		enqueue(&axp->txq,bpp);
 	}
-	return lapb_output(axp);
+	queue_lapb_output(axp);
 }
 
 /* Receive incoming data on an AX.25 connection */
