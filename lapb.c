@@ -222,11 +222,9 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			if(poll){
 				// sendctl(RESPONSE, RNR, RR)
 				//sendctl(axp,LAPB_RESPONSE,tmp|PF);
-				axp->response = tmp | PF;
 				stop_timer(&axp->t2);
 				start_timer(&axp->t2);
 			} else {
-				axp->response = tmp;
 				stop_timer(&axp->t2);
 				start_timer(&axp->t2);
 			}
@@ -354,11 +352,9 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			if(poll){
 				// sendctl(RESPONSE, RNR / RR)
 				//sendctl(axp,LAPB_RESPONSE,tmp|PF);
-				axp->response = tmp | PF;
 				stop_timer(&axp->t2);
 				start_timer(&axp->t2);
 			} else {
-				axp->response = tmp;
 				stop_timer(&axp->t2);
 				start_timer(&axp->t2);
 			}
@@ -403,7 +399,10 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 	 * If successful, lapb_output will clear axp->response.
 	 */
 	lapb_output(axp);
-
+	if (axp->response != 0){
+		sendctl(axp,LAPB_RESPONSE,axp->response);
+		axp->response = 0;
+	}
 	if (axp->state == LAPB_DISCONNECTED) {
 		del_ax25(axp);
 	}

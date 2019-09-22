@@ -4,11 +4,10 @@
 # parameters for typical UNIX installation
 #
 CC= gcc
-RM= del
+RM= rm -f
 LIB= ar
-CFLAGS= -g -DHOST_BSD -Werror -Wno-int-to-void-pointer-cast -O3
-LFLAGS= -lcurses
-
+CFLAGS= -g -DHOST_BSD -Wall -Werror -Wno-int-to-void-pointer-cast -O3
+LFLAGS= -lcurses -pthreads
 
 # List of libraries
 
@@ -63,7 +62,7 @@ DUMP= 	trace.o enetdump.o arcdump.o \
 	ipdump.o icmpdump.o udpdump.o tcpdump.o ripdump.o
 
 UNIX=	ksubr_unix.o timer_unix.o display_crs.o unix.o dirutil_unix.o \
-	tapdrvr.o tundrvr.o enet.o
+	enet.o
 
 DSP=	fsk.o mdb.o qpsk.o fft.o r4bf.o fano.o tab.o
 
@@ -127,7 +126,7 @@ srcrcs.zip:
 src.zip:
 	-pkzip -u src.zip makefile turboc.cfg dodeps.sh *.c *.h *.s
 
-clean:	nul
+clean:
 	$(RM) *.a
 	$(RM) *.o
 	$(RM) *.exe

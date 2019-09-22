@@ -428,11 +428,13 @@ struct cmds Attab[] = {
 	{ "packet", pk_attach, 0, 4, "attach packet <int#> <label> <buffers> <mtu> [ip_addr]" },
 #endif
 #ifdef	UNIX
+#if 0
 	/* BSD Ethernet TAP device */
 	{ "tap", tap_attach, 0, 4, "attach tap <path> <label> <ethaddr> <mtu>" },
 
 	/* BSD IP TUN device */
 	{ "tun", tun_attach, 0, 4, "attach tun <path> <label> <mtu>" },
+#endif
 #endif
 #endif
 #ifdef	HS
