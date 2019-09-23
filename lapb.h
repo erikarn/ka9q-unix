@@ -168,6 +168,7 @@ void est_link(struct ax25_cb *axp);
 void lapbstate(struct ax25_cb *axp,int s);
 int lapb_input(struct ax25_cb *axp,int cmdrsp,struct mbuf **bp);
 int lapb_output(struct ax25_cb *axp);
+void queue_ack_frame(struct ax25_cb *axp, int frame_type, int pf);
 void queue_lapb_output(struct ax25_cb *axp);
 struct mbuf *segmenter(struct mbuf **bp,uint ssize);
 int sendctl(struct ax25_cb *axp,int cmdrsp,int cmd);

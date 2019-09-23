@@ -221,11 +221,8 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			/* Reject or ignore I-frames with receive sequence number errors */
 			if(ns != axp->vr){
 				if(axp->proto == V1 || !axp->flags.rejsent){
+					queue_ack_frame(axp, REJ, (!! pf));
 					axp->flags.rejsent = YES;
-					axp->flags.send_rej = 1;
-					axp->flags.send_pf = (!! pf);
-					axp->flags.send_ack = 1;
-					start_timer(&axp->t2);
 				} else if(poll) {
 					enq_resp(axp);
 				}
@@ -236,18 +233,9 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			axp->vr = (axp->vr+1) & MMASK;
 			tmp = len_p(axp->rxq) >= axp->window ? RNR : RR;
 			if(poll){
-				//sendctl(axp,LAPB_RESPONSE,tmp|PF);
-				stop_timer(&axp->t2);
-				axp->flags.send_rej = 0;
-				axp->flags.send_pf = 1;
-				axp->flags.send_ack = 1;
-				start_timer(&axp->t2);
+				queue_ack_frame(axp, tmp, 1);
 			} else {
-				stop_timer(&axp->t2);
-				axp->flags.send_rej = 0;
-				axp->flags.send_pf = 0;
-				axp->flags.send_ack = 1;
-				start_timer(&axp->t2);
+				queue_ack_frame(axp, tmp, 0);
 			}
 			procdata(axp,bpp);
 			break;
@@ -353,11 +341,7 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 				 * drastic action is necessary to avoid
 				 * memory deadlock.
 				 */
-				// sendctl(RESPONSE, RNR)
-				axp->flags.send_rej = 0;
-				axp->flags.send_pf = !! pf;
-				axp->flags.send_ack = 1;
-				start_timer(&axp->t2);
+				queue_ack_frame(axp, RNR, 1);
 				free_p(bpp);
 				break;
 			}
@@ -365,10 +349,7 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			if(ns != axp->vr){
 				if(axp->proto == V1 || !axp->flags.rejsent){
 					axp->flags.rejsent = YES;
-					axp->flags.send_rej = 1;
-					axp->flags.send_pf = !! pf;
-					axp->flags.send_ack = 1;
-					start_timer(&axp->t2);
+					queue_ack_frame(axp, REJ, (!! pf));
 				}
 				axp->response = 0;
 				break;
@@ -379,17 +360,9 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 			if(poll){
 				// sendctl(RESPONSE, RNR / RR)
 				//sendctl(axp,LAPB_RESPONSE,tmp|PF);
-				axp->flags.send_rej = 0;
-				axp->flags.send_pf = 1;
-				axp->flags.send_ack = 1;
-				stop_timer(&axp->t2);
-				start_timer(&axp->t2);
+				queue_ack_frame(axp, tmp, 1);
 			} else {
-				stop_timer(&axp->t2);
-				axp->flags.send_rej = 0;
-				axp->flags.send_pf = 0;
-				axp->flags.send_ack = 1;
-				start_timer(&axp->t2);
+				queue_ack_frame(axp, tmp, 0);
 			}
 			procdata(axp,bpp);
 			break;
@@ -547,22 +520,17 @@ enq_resp(struct ax25_cb *axp)
 	char ctl;
 
 	stop_timer(&axp->t3);
-	stop_timer(&axp->t2);
 
+	/* Make sure no responses go out at the completion of lapb_input() */
+	axp->response = 0;
 	/*
 	 * Experiment with this being a T2 timer so they're not
 	 * spammed out.  The T2 timer here may be a bit long
 	 * in response to a poll, but if this works well then
 	 * maybe it'll be worth making the T2 timer variable.
 	 */
-	axp->flags.send_ack = 1;
-	axp->flags.send_rej = 0;
-	axp->flags.send_pf = 1;
-
-	ctl = len_p(axp->rxq) >= axp->window ? RNR|PF : RR|PF;
-	/* Make sure no pending responses go out in the data path */
-	axp->response = 0;
-	start_timer(&axp->t2);
+	ctl = len_p(axp->rxq) >= axp->window ? RNR : RR;
+	queue_ack_frame(axp, ctl, 1);
 }
 /* Invoke retransmission */
 static void
@@ -609,6 +577,37 @@ int cmd
 		cmd |= (axp->vr << 5);
 	}
 	return sendframe(axp,cmdrsp,cmd,&mb);
+}
+
+/*
+ * Update the deferred ACK processing with an updated state to send
+ * to the peer.
+ *
+ * This updates the peer configuration for what was last seen/requested
+ * from the peer.  It also kicks the timer if required.
+ *
+ * This is only valid for S frame types of RR, RNR and REJ.
+ */
+void
+queue_ack_frame(struct ax25_cb *axp, int frame_type, int pf)
+{
+	switch (frame_type) {
+	case RR:
+	case RNR:
+		axp->flags.send_rej = 0;
+		axp->flags.send_pf = (!! pf);
+		axp->flags.send_ack = 1;
+		start_timer(&axp->t2);
+		break;
+	case REJ:
+		axp->flags.send_rej = 1;
+		axp->flags.send_pf = (!! pf);
+		axp->flags.send_ack = 1;
+		start_timer(&axp->t2);
+		break;
+	default:
+		break;
+	}
 }
 
 /*
