@@ -399,30 +399,30 @@ struct mbuf **bpp		/* Rest of frame, starting with ctl */
 		break;
 	/* XXX TODO: figure out (read the spec) to know how to enter this state from a received frame */
 	case LAPB_FRAMEREJECT:
-                switch(type){
-                case SABM:
-                        sendctl(axp,LAPB_RESPONSE,UA|pf);
-                        clr_ex(axp);
-                        axp->unack = axp->vr = axp->vs = 0;
-                        stop_timer(&axp->t1);
-                        start_timer(&axp->t3);
-                        lapbstate(axp,LAPB_CONNECTED);
-                        break;
-                case DISC:
-                        free_q(&axp->txq);
-                        sendctl(axp,LAPB_RESPONSE,UA|pf);
-                        stop_timer(&axp->t1);
-                        lapbstate(axp,LAPB_DISCONNECTED);
-                        break;
-                case DM:
-                        stop_timer(&axp->t1);
-                        lapbstate(axp,LAPB_DISCONNECTED);
-                        break;
-                default:
-                        frmr(axp,0,0);
-                        break;
-                }
-                break;
+		switch(type){
+		case SABM:
+			sendctl(axp,LAPB_RESPONSE,UA|pf);
+			clr_ex(axp);
+			axp->unack = axp->vr = axp->vs = 0;
+			stop_timer(&axp->t1);
+			start_timer(&axp->t3);
+			lapbstate(axp,LAPB_CONNECTED);
+			break;
+		case DISC:
+			free_q(&axp->txq);
+			sendctl(axp,LAPB_RESPONSE,UA|pf);
+			stop_timer(&axp->t1);
+			lapbstate(axp,LAPB_DISCONNECTED);
+			break;
+		case DM:
+			stop_timer(&axp->t1);
+			lapbstate(axp,LAPB_DISCONNECTED);
+			break;
+		default:
+			frmr(axp,0,0);
+			break;
+		}
+		break;
 	default:
 		break;
 	}
@@ -580,20 +580,20 @@ inv_rex(struct ax25_cb *axp)
 int
 frmr(struct ax25_cb *axp, char control, char reason)
 {
-        struct mbuf *frmrinfo;
-        char *cp;
+	struct mbuf *frmrinfo;
+	char *cp;
 
-        if(reason != 0){
-                cp = axp->frmrinfo;
-                *cp++ = control;
-                *cp++ =  axp->vr << 5 || axp->vs << 1;
-                *cp = reason;
-        }
-        if((frmrinfo = alloc_mbuf(3)) == NULL)
-                return -1;      /* No memory */
-        frmrinfo->cnt = 3;
-        memcpy(frmrinfo->data,axp->frmrinfo,3);
-        return sendframe(axp,LAPB_RESPONSE,FRMR|(control&PF),&frmrinfo);
+	if(reason != 0){
+		cp = axp->frmrinfo;
+		*cp++ = control;
+		*cp++ =  axp->vr << 5 || axp->vs << 1;
+		*cp = reason;
+	}
+	if((frmrinfo = alloc_mbuf(3)) == NULL)
+		return -1;      /* No memory */
+	frmrinfo->cnt = 3;
+	memcpy(frmrinfo->data,axp->frmrinfo,3);
+	return sendframe(axp,LAPB_RESPONSE,FRMR|(control&PF),&frmrinfo);
 }
 
 /* Send S or U frame to currently connected station */
@@ -618,9 +618,7 @@ int cmd
  */
 void
 queue_lapb_output(struct ax25_cb *axp)
-
 {
-
 	/*
 	 * Don't try to queue further work if we're not connected.
 	 */
