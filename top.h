@@ -6,7 +6,7 @@
 #define USE_SYSTEM_MALLOC
 #define HAVE_STRDUP
 #define HAVE_UNIX_TIMEOFDAY
-#define HAVE_FUNOPEN
+//#define HAVE_FUNOPEN
 #define NO_STD_DUPLICATION
 #define USE_SYSTEM_SPRINTF
 #define UNIX

@@ -41,9 +41,12 @@ void
 ioinit(int hinit)
 {
 
+#if HAVE_SRANDOMDEV
 	/* Initialize random number generator */
 	srandomdev();
-
+#elif HAVE_SRANDOM
+	srandom(time());
+#endif
 	if (unix_timer_start() != 0) {
 		fprintf(stderr, "Can't start timer thread: %s\n",
 			strerror(errno));

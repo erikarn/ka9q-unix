@@ -1,5 +1,5 @@
-#ifndef	_ERRNO_H
-#define	_ERRNO_H
+#ifndef	_KA9Q_ERRNO_H
+#define	_KA9Q_ERRNO_H
 
 #define kerrno (Curproc->perrno)
 
