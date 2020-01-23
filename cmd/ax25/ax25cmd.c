@@ -639,6 +639,10 @@ unproto_output(int unused, void *tn1, void *p)
 			kprintf("%s: Hit EOF on stdin\n", __func__);
 			break;
 		}
+		if (buf[0] == '\r' || buf[0] == '\n') {
+			continue;
+		}
+
 		kprintf("--> %s", buf);
 
 		ret = ksendto(sp->network_fd, buf, strlen(buf), 0, NULL, 0);
