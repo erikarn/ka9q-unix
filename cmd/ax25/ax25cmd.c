@@ -725,7 +725,16 @@ unproto_connect(struct session *sp, struct ksockaddr *fsocket,int len)
 }
 
 
-/* Initiate unproto AX.25 session to the given digipeater path/call */
+/*
+ * Initiate unproto AX.25 session to the given digipeater path/call
+ *
+ * TODO: right now the AX.25 UI code pops everything up to the socket;
+ * it's not paying attention to the destination node/path (as it
+ * only handles a single socket right now, etc.)
+ *
+ * Even then, it's not clear right now how this should look once
+ * multiple AX.25 UI sockets are supported.
+ */
 int
 do_unproto_connect(int argc,char *argv[], void *p)
 {
