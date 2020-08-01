@@ -192,6 +192,7 @@ struct mbuf **bpp
 	uint8 (*mpp)[AXALEN];
 	int mcast;
 	uint8 *isrc,*idest;	/* "immediate" source and destination */
+	int dst_for_us = 0;
 
 	/* Pull header off packet and convert to host structure */
 	if(ntohax25(&hdr,bpp) < 0){
@@ -217,6 +218,13 @@ struct mbuf **bpp
 	else
 		idest = hdr.dest;
 
+	/*
+	 * Quick track to see if this packet is destined for us.
+	 */
+	if (addreq(idest, iface->hwaddr)) {
+		dst_for_us = 1;
+	}
+
 	/* Don't log our own packets if we overhear them, as they're
 	 * already logged by axsend() and by the digipeater code.
 	 */
@@ -233,23 +241,32 @@ struct mbuf **bpp
 		}
 	}
 	if(!mcast && !addreq(idest,iface->hwaddr)){
+		//kprintf("%s: called; not for us\n", __func__);
+		dst_for_us = 0;
 		/* Not a broadcast, and not addressed to us. Inhibit
 		 * transmitter to avoid colliding with addressed station's
-		 * response, and discard packet.
+		 * response.
 		 */
 		if(iface->ioctl != NULL)
 			(*iface->ioctl)(iface,PARAM_MUTE,1,-1);
-		free_p(bpp);
-		return;
+		/*
+		 * Note: we used to exit here and discard the packet,
+		 * but this stops us from receiving UI frames that
+		 * aren't multicast and destined to us (eg wanting
+		 * to register far various APRS services.)
+		 */
 	}
-	if(!mcast && iface->ioctl != NULL){
+
+	if((!mcast) && dst_for_us && iface->ioctl != NULL){
 		/* Packet was sent to us; abort transmit inhibit */
 		(*iface->ioctl)(iface,PARAM_MUTE,1,0);
 	}
-	/* At this point, packet is either addressed to us, or is
-	 * a multicast.
+
+	/*
+	 * Only consider digipeating if the frame is multicast or destined
+	 * to us.
 	 */
-	if(hdr.nextdigi < hdr.ndigis){
+	if(dst_for_us && (hdr.nextdigi < hdr.ndigis)) {
 		/* Packet requests digipeating. See if we can repeat it. */
 		if(Digipeat && !mcast){
 			/* Yes, kick it back out. htonax25 will set the
@@ -270,18 +287,21 @@ struct mbuf **bpp
 		free_p(bpp);	/* Dispose if not forwarded */
 		return;
 	}
-	/* If we reach this point, then the packet has passed all digis,
-	 * and is either addressed to us or is a multicast.
+	/*
+	 * If we reach this point, then the packet has passed all digis.
+	 * Return if we're done.
 	 */
 	if(*bpp == NULL)
 		return;		/* Nothing left */
 
 	/* If there's no locally-set entry in the routing table and
 	 * this packet has digipeaters, create or update it. Leave
-	 * local routes alone.
+	 * local routes alone.  Only do this for frames that are
+	 * multicast or destined for us.
 	 */
-	if(((axr = ax_lookup(hdr.source)) == NULL || axr->type == AX_AUTO)
-	 && hdr.ndigis > 0){
+	if ((mcast || dst_for_us) &&
+	   ((axr = ax_lookup(hdr.source)) == NULL || axr->type == AX_AUTO) &&
+	    (hdr.ndigis > 0)) {
 		uint8 digis[MAXDIGIS][AXALEN];
 		int i,j;
 
@@ -292,6 +312,7 @@ struct mbuf **bpp
 		}
 		ax_add(hdr.source,AX_AUTO,digis,hdr.ndigis);
 	}
+
 	/* Sneak a peek at the control field. This kludge is necessary because
 	 * AX.25 lacks a proper protocol ID field between the address and LAPB
 	 * sublayers; a control value of UI indicates that LAPB is to be
@@ -317,10 +338,12 @@ struct mbuf **bpp
 			free_p(bpp);
 		return;
 	}
-	/* Everything from here down is connected-mode LAPB, so ignore
-	 * multicasts
+
+	/*
+	 * Everything from here down is connected-mode LAPB, so ignore
+	 * multicasts and frames not destined to us.
 	 */
-	if(mcast){
+	if(mcast || (dst_for_us == 0)){
 		free_p(bpp);
 		return;
 	}

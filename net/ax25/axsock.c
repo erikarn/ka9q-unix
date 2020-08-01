@@ -28,21 +28,34 @@ struct iface *iface,
 uint8 *src,
 struct mbuf **bpp
 ){
-	struct mbuf *hdr;
-	struct ksockaddr_ax *sax;
+	struct ksockaddr_ax sax;
 
 	if(Axui_sock == -1){
 		/* Nobody there to read it */
 		free_p(bpp);
 	} else {
-		pushdown(&hdr,NULL,sizeof(struct ksockaddr_ax));
-		sax = (struct ksockaddr_ax *)hdr->data;
-		sax->sax_family = kAF_AX25;
-		memcpy(sax->ax25_addr,src,AXALEN);
-		strncpy(sax->iface,iface->name,ILEN);
-		hdr->next = (*bpp);
-		*bpp = NULL;
-		enqueue(&Bcq,&hdr);
+		memset(&sax, 0, sizeof(sax));
+		/*
+		 * Ok, so we're storing the source and interface, but
+		 * not the destination? What's the receiver doing
+		 * there?  Can we somehow communicate both up to the
+		 * protocol layer?
+		 *
+		 * Same with the whole digipeater path on the receive
+		 * side?  That may be useful information for the
+		 * upper layers.
+		 */
+
+		// XXX TODO: why not call pushdown directly?
+		// Just need to populate sax and then copy IT in
+
+		//pushdown(&hdr,NULL,sizeof(struct ksockaddr_ax));
+		sax.sax_family = kAF_AX25;
+		memcpy(sax.ax25_addr,src,AXALEN);
+		strncpy(sax.iface,iface->name,ILEN);
+
+		pushdown(bpp, &sax, sizeof(sax));
+		enqueue(&Bcq,bpp);
 	}
 }
 
@@ -235,6 +248,7 @@ int *fromlen
 		}
 	}
 	if(s != Axui_sock){
+		kprintf("%s: -> kENOTCONN\n", __func__);
 		kerrno = kENOTCONN;
 		return -1;
 	}
