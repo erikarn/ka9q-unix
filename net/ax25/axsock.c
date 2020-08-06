@@ -45,11 +45,6 @@ struct mbuf **bpp
 		 * side?  That may be useful information for the
 		 * upper layers.
 		 */
-
-		// XXX TODO: why not call pushdown directly?
-		// Just need to populate sax and then copy IT in
-
-		//pushdown(&hdr,NULL,sizeof(struct ksockaddr_ax));
 		sax.sax_family = kAF_AX25;
 		memcpy(sax.ax25_addr,src,AXALEN);
 		strncpy(sax.iface,iface->name,ILEN);
